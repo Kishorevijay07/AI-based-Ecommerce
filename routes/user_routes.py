@@ -11,8 +11,6 @@ async def create_user(user: User):
         return await user_controller.create_user(user)
     except Exception as e:
         return {"error": str(e)}
-
-
 @router.get('/')
 async def get_all_users():
     try:
