@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+motor
+python-dotenv
+pydantic
+bson  # optional; bson comes with pymongo but we used bson.ObjectId above
