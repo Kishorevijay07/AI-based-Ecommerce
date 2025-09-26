@@ -1,43 +1,52 @@
-
-
-    # Implement web scraping logic here
-import requests
+import httpx
 from bs4 import BeautifulSoup
+import asyncio
 import json
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120 Safari/537.36",
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/120 Safari/537.36",
     "Accept-Language": "en-US,en;q=0.9",
 }
 
-def fetch_page(url):
-    """Fetch HTML content of a page"""
-    resp = requests.get(url, headers=HEADERS, timeout=15)
-    resp.raise_for_status()
-    return resp.text
 
-def parse_amazon(html):
+async def fetch_page(url):
+    """Fetch HTML content of a page (async safe)"""
+    async with httpx.AsyncClient(timeout=15) as client:
+        resp = await client.get(url, headers=HEADERS)
+        resp.raise_for_status()
+        return resp.text
+
+
+async def parse_amazon(html):
     """Parse Amazon product page and extract details"""
     soup = BeautifulSoup(html, "html.parser")
 
     # Title
-    title = soup.select_one("#productTitle")
-    title = title.get_text(strip=True) if title else None
+    title_el = soup.select_one("#productTitle")
+    title = title_el.get_text(strip=True) if title_el else None
 
     # Price
     price = None
-    for sel in ("#priceblock_ourprice", "#priceblock_dealprice", "#corePrice_feature_div .a-offscreen"):
+    price_selectors = [
+        "#priceblock_ourprice",
+        "#priceblock_dealprice",
+        "#corePrice_feature_div .a-offscreen",
+        "span.a-price span.a-offscreen",
+        "span[data-a-color='price'] span.a-offscreen",
+        "span[data-a-color='base'] span.a-offscreen"
+    ]
+    for sel in price_selectors:
         el = soup.select_one(sel)
-        if el:
+        if el and el.get_text(strip=True):
             price = el.get_text(strip=True)
             break
 
     # Rating & review count
     rating_el = (soup.select_one("i[data-hook='average-star-rating']") or
-                soup.select_one("span[data-hook='rating-out-of-text']") or
-                soup.select_one(".a-icon-alt"))
+                 soup.select_one("span[data-hook='rating-out-of-text']") or
+                 soup.select_one(".a-icon-alt"))
     rating = rating_el.get_text(strip=True) if rating_el else None
 
     review_count_el = soup.select_one("#acrCustomerReviewText")
@@ -99,39 +108,15 @@ def parse_amazon(html):
         "related_links": related_links[:5]  # limit to first 5
     }
 
-def web_scraper_service(url: str):
-    """Main function to fetch Amazon product and return JSON"""
-    html = fetch_page(url)
-    data = parse_amazon(html)
-
-    # Fetch related links data
-    related_dict = {}
+async def search_via_internet(url: str):
+    html = await fetch_page(url)
+    data = await parse_amazon(html)
+    d = {}
     for link in data["related_links"]:
-        html_related = fetch_page(link)
-        temp_data = parse_amazon(html_related)
-        related_dict[link] = temp_data["related_links"][:5]
-
-    data["related_products_expanded"] = related_dict
-
-    return json.dumps(data, indent=2, ensure_ascii=False)
-
-
-
-
-url = "https://www.amazon.in/Samsung-Galaxy-Smartphone-Titanium-Storage/dp/B0CS5XW6TN/ref=sr_1_1?_encoding=UTF8&content-id=amzn1.sym.15692926-7af5-4978-a095-8e6f1f81f807&dib=eyJ2IjoiMSJ9.h5D_SB61tNg4XGcuTwO61vJuOJuTAAUl9npQvDxHg_1ZA6Y-oVQCOp5RcBmFIoc-6lFlvBADiexjR_Czl7wHcVlghVyDwqK4dfFmK5PF7sv-EHxTfHHfmjPDap3g24PBfTyGyzfY72TRoh-lIewqjHARjlc1ddiP85dP87c-3U6tfw0Iky1KxHsCbSdL0QaWATtICUPU1QAu8qyYPGQY5JfNVcbtKmPOkpxSsc7EEeCH3hgGn51r_Fej7qZ149bPkCt40A_UsJm94tUeOJLr7vZtQPZI9CpJzETf3P5NYP0.q_SiM0L0922-RMChDYHvpJNGz2-XQbQfNzJ3g6DlQb4&dib_tag=se&pd_rd_r=0188c998-4fa2-4e76-a384-c12150a57c2f&pd_rd_w=A4ILp&pd_rd_wg=nMCwb&qid=1758691093&refinements=p_123%3A46655&rnid=1389432031&s=electronics&sr=1-1"
-html = fetch_page(url)
-data = parse_amazon(html)
-res=[]
-print(data["related_links"])
-d={}
-for i in range(len(data["related_links"])):
-    html = fetch_page(data["related_links"][i])
-    temp_data = parse_amazon(html)
-    for j in temp_data["related_links"]:
-        res.append(j)
-    print("len",len(res))
-    d[data["related_links"][i]]=res
-    print("Dictionary : ",d)
-    res=[]
-print(json.dumps(data, indent=2, ensure_ascii=False))
-print()
+        try:
+            html = await fetch_page(link)
+            temp_data = await parse_amazon(html)
+            d[link] = temp_data["related_links"]
+        except Exception as e:
+            d[link] = f"Error fetching: {e}"
+    return {"main_product": data, "related_products": d}

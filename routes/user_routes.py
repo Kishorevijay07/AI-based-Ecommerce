@@ -24,3 +24,4 @@ async def get_user_by_email(email: str):
         return await user_controller.get_user_by_email(email)
     except Exception as e:
         return {"error": str(e)}
+    

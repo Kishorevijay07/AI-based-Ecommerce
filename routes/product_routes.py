@@ -22,10 +22,13 @@ async def get_product_route(product_id: str):
     return await product_controller.get_product(product_id)
 
 
+# from services.Scrappers import search_via_internet
+# import asyncio
 
-from services.Scrappers import web_scraper_service
-@router.get('/search-via-internet')
-async def search_via_internet_route(url: str):
-    print("url", url)
 
-    return await product_controller.web_scraper_service(url)
+# @router.get('/search-via-internet', response_model=dict)
+# async def search_via_internet_route():
+#     url = "https://www.amazon.in/dp/B0FDL3VZR8"
+#     result = await search_via_internet(url)
+#     return result
+

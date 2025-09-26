@@ -59,7 +59,7 @@ async def get_products() -> List[ProductResponse]:
 
 async def get_product(product_id: str) -> ProductResponse:
     if not ObjectId.is_valid(product_id):
-        raise HTTPException(status_code=400, detail="Invalid product ID")
+        raise HTTPException(status_code=400, detail="Invalidddddd product ID")
 
     doc = await db["products"].find_one({"_id": ObjectId(product_id)})
     if not doc:
@@ -67,8 +67,3 @@ async def get_product(product_id: str) -> ProductResponse:
 
     transformed = _transform_doc(doc)
     return ProductResponse(**transformed)
-
-from services.Scrappers import web_scraper_service
-def search_via_internet(url: str):
-    data = web_scraper_service(url)
-    return data
